@@ -27,18 +27,31 @@ class MatrixFactorization(object):
     def squared_error(self, input):
         return T.sum(T.sqr(input - self.pred))
 
+def readData():
+    matrix = sp.lil_matrix((n_users,n_items))
+    f = open ('u.data', 'r') # user id | item id | rating | timestamp.
+    for line in f:
+        lst = line.split("\t", 3)
+
+        usr = int(lst[0])-1
+        itm = int(lst[1])-1
+        matrix[usr, itm] = int(lst[2])
+    matrix = matrix.todense()
+    return matrix
+
 X = T.matrix('X')
-learning_rate = 0.01
+learning_rate = 0.0001
 n_users = 943
 n_items = 1682
-n_fac = 100
+n_fac = 30
 
 model = MatrixFactorization(n_users=n_users, n_items=n_items, n_fac=n_fac)
 
 evaluate_model = theano.function(inputs=[X, ], outputs=model.squared_error(X))
 
 
-data = np.random.randn(n_users, n_items).astype(theano.config.floatX)
+#data = np.random.randn(n_users, n_items).astype(theano.config.floatX)
+data = readData()
 
 model.U.set_value(0.01 * np.random.randn(n_users, n_fac))
 model.V.set_value(0.01 * np.random.randn(n_fac, n_items))
@@ -101,7 +114,7 @@ for i in range(100):
     avg_cost = train_model(data)
     #print model.U.get_value()
     #print get_grads(data)
-    print 'error: %4.4f' % avg_cost
+    print str(i) + ' error: %4.4f' % avg_cost
     approx = np.dot(model.U.get_value(), model.V.get_value())
 
     fig.canvas.restore_region(bg[1])
