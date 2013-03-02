@@ -24,13 +24,13 @@ class MatrixFactorization(object):
 
         self.pred = T.dot(self.U, self.V)
 
-    def squared_error(self, input):
+    def squared_errorOld(self, input):
         return T.sum(T.sqr(input - self.pred))
 
-    def squared_error2(self, sparseData, rowInd, colInd):
-        return T.sum(T.squared(sparseData-self.pred[rowInd, colInd]))
+    def squared_error(self, sparseData, rowInd, colInd):
+        return T.sum(T.square(sparseData-self.pred[rowInd, colInd]))
 
-def readData():
+def readDataOld():
     matrix = sp.lil_matrix((n_users,n_items))
     f = open ('u.data', 'r') # user id | item id | rating | timestamp.
     for line in f:
@@ -42,7 +42,7 @@ def readData():
     matrix = matrix.todense()
     return matrix
 
-def readData2():
+def readData():
     f = open ('u.data', 'r') # user id | item id | rating | timestamp.
     sparseData = []
     rowInd = []
@@ -57,7 +57,6 @@ def readData2():
     return myTuple
 
 X = T.matrix('X')
-
 sparseData = T.vector('sparseData', dtype=theano.config.floatX)
 rowInd = T.vector('rowInd', dtype='int64')  # symbolic var for row indices
 colInd = T.vector('colInd', dtype='int64')  # symbolic var for col indices
@@ -69,11 +68,15 @@ n_fac = 30
 
 model = MatrixFactorization(n_users=n_users, n_items=n_items, n_fac=n_fac)
 
-evaluate_model = theano.function(inputs=[X, ], outputs=model.squared_error(X))
+#evaluate_model = theano.function(inputs=[sparseData, rowInd,colInd ], outputs=model.squared_error(sparseData, rowInd, colInd))
 
 
 #data = np.random.randn(n_users, n_items).astype(theano.config.floatX)
 data = readData()
+
+# create a matrix for use in the visual representation
+sparse_csc = sp.csc_matrix((data[0], (data[1], data[2])), shape=(n_users, n_items))
+actualMatrix = sparse_csc.todense()
 
 model.U.set_value(0.01 * np.random.randn(n_users, n_fac))
 model.V.set_value(0.01 * np.random.randn(n_fac, n_items))
@@ -87,7 +90,8 @@ model.V.set_value(0.01 * np.random.randn(n_fac, n_items))
 
 # Where the magic happens, ask Graham to walk through it, I don't understand how 
     # taking the derivative of the sum of squared errors with respect to U/v could possibly work let alone factor the matrix...
-cost = model.squared_error(X)
+costOld = model.squared_errorOld(X)
+cost = model.squared_error(sparseData, rowInd, colInd)
 
 #take the derivative of cost with respect to U or V.
 g_U = T.grad(cost=cost, wrt=model.U)
@@ -97,7 +101,7 @@ g_V = T.grad(cost=cost, wrt=model.V)
 updates = {model.U: model.U - learning_rate * g_U, \
            model.V: model.V - learning_rate * g_V}
 
-train_model = theano.function(inputs=[X, ],
+train_model = theano.function(inputs=[sparseData, rowInd, colInd ],
                               outputs=cost,
                               updates=updates)
 
@@ -112,8 +116,8 @@ plt.show()
 
 imargs = {'cmap': 'gray', 'interpolation': 'nearest'}
 
-subs[0].set_title('Matrix')
-im0 = subs[0].imshow(data, animated=True, **imargs)
+subs[0].set_title('Actual Matrix')
+im0 = subs[0].imshow(actualMatrix, animated=True, **imargs)
 
 subs[1].set_title('Approximation by factoring')
 im1 = subs[1].imshow(np.dot(model.U.get_value(), model.V.get_value()),
@@ -133,7 +137,7 @@ bg = (canvas.copy_from_bbox(subs[0].bbox),
       canvas.copy_from_bbox(subs[1].bbox))
 sleep(5)
 for i in range(100):
-    avg_cost = train_model(data)
+    avg_cost = train_model(data[0], data[1], data[2])
     #print model.U.get_value()
     #print get_grads(data)
     print str(i) + ' error: %4.4f' % avg_cost
