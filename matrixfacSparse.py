@@ -24,23 +24,8 @@ class MatrixFactorization(object):
 
         self.pred = T.dot(self.U, self.V)
 
-    def squared_errorOld(self, input):
-        return T.sum(T.sqr(input - self.pred))
-
     def squared_error(self, sparseData, rowInd, colInd):
         return T.sum(T.square(sparseData-self.pred[rowInd, colInd]))
-
-def readDataOld():
-    matrix = sp.lil_matrix((n_users,n_items))
-    f = open ('u.data', 'r') # user id | item id | rating | timestamp.
-    for line in f:
-        lst = line.split("\t", 3)
-
-        usr = int(lst[0])-1
-        itm = int(lst[1])-1
-        matrix[usr, itm] = int(lst[2])
-    matrix = matrix.todense()
-    return matrix
 
 def readData():
     f = open ('u.data', 'r') # user id | item id | rating | timestamp.
@@ -56,11 +41,9 @@ def readData():
     myTuple = sparseData, rowInd, colInd
     return myTuple
 
-X = T.matrix('X')
 sparseData = T.vector('sparseData', dtype=theano.config.floatX)
 rowInd = T.vector('rowInd', dtype='int64')  # symbolic var for row indices
 colInd = T.vector('colInd', dtype='int64')  # symbolic var for col indices
-
 learning_rate = 0.0001
 n_users = 943
 n_items = 1682
@@ -70,8 +53,6 @@ model = MatrixFactorization(n_users=n_users, n_items=n_items, n_fac=n_fac)
 
 #evaluate_model = theano.function(inputs=[sparseData, rowInd,colInd ], outputs=model.squared_error(sparseData, rowInd, colInd))
 
-
-#data = np.random.randn(n_users, n_items).astype(theano.config.floatX)
 data = readData()
 
 # create a matrix for use in the visual representation
@@ -86,14 +67,8 @@ model.V.set_value(0.01 * np.random.randn(n_fac, n_items))
 # print np.sum(np.square(data - (np.dot(BY,C))))
 # print evaluate_model(data)
 
-#cost now contains a function which calculates the squared error based off of X
-
-# Where the magic happens, ask Graham to walk through it, I don't understand how 
-    # taking the derivative of the sum of squared errors with respect to U/v could possibly work let alone factor the matrix...
-costOld = model.squared_errorOld(X)
 cost = model.squared_error(sparseData, rowInd, colInd)
 
-#take the derivative of cost with respect to U or V.
 g_U = T.grad(cost=cost, wrt=model.U)
 g_V = T.grad(cost=cost, wrt=model.V)
 
