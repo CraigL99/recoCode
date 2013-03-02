@@ -27,6 +27,9 @@ class MatrixFactorization(object):
     def squared_error(self, input):
         return T.sum(T.sqr(input - self.pred))
 
+    def squared_error2(self, sparseData, rowInd, colInd):
+        return T.sum(T.squared(sparseData-self.pred[rowInd, colInd]))
+
 def readData():
     matrix = sp.lil_matrix((n_users,n_items))
     f = open ('u.data', 'r') # user id | item id | rating | timestamp.
@@ -39,7 +42,26 @@ def readData():
     matrix = matrix.todense()
     return matrix
 
+def readData2():
+    f = open ('u.data', 'r') # user id | item id | rating | timestamp.
+    sparseData = []
+    rowInd = []
+    colInd = []
+    for line in f:
+        lst = line.split("\t", 3)
+        rowInd.append( int(lst[0])-1 )
+        colInd.append( int(lst[1])-1 )
+        sparseData.append( int(lst[2]) )
+
+    myTuple = sparseData, rowInd, colInd
+    return myTuple
+
 X = T.matrix('X')
+
+sparseData = T.vector('sparseData', dtype=theano.config.floatX)
+rowInd = T.vector('rowInd', dtype='int64')  # symbolic var for row indices
+colInd = T.vector('colInd', dtype='int64')  # symbolic var for col indices
+
 learning_rate = 0.0001
 n_users = 943
 n_items = 1682
