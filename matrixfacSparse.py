@@ -39,26 +39,41 @@ def readData():
         sparseData.append( int(lst[2]) )
 
     myTuple = sparseData, rowInd, colInd
-    return myTuple
+    shared_sparseData = theano.shared( np.asarray(sparseData, dtype=theano.config.floatX) )
+    shared_rowInd = theano.shared( np.asarray(rowInd, dtype=theano.config.floatX) )
+    shared_colInd = theano.shared( np.asarray(colInd, dtype=theano.config.floatX) )
+
+    return shared_sparseData, T.cast(shared_rowInd, 'int32'), T.cast(shared_colInd, 'int32')
+    #return myTuple
 
 sparseData = T.vector('sparseData', dtype=theano.config.floatX)
-rowInd = T.vector('rowInd', dtype='int64')  # symbolic var for row indices
-colInd = T.vector('colInd', dtype='int64')  # symbolic var for col indices
+rowInd = T.vector('rowInd', dtype='int32')  # symbolic var for row indices
+colInd = T.vector('colInd', dtype='int32')  # symbolic var for col indices
+index = T.lscalar()  # index to a [mini]batch
 learning_rate = 0.0001
 n_users = 943
 n_items = 1682
 n_fac = 30
+batch_size = 10000
 
 model = MatrixFactorization(n_users=n_users, n_items=n_items, n_fac=n_fac)
 
 #evaluate_model = theano.function(inputs=[sparseData, rowInd,colInd ], outputs=model.squared_error(sparseData, rowInd, colInd))
 
 data = readData()
+s_d = data[0]
+r_d = data[1]
+c_d = data[2]
+
+#s_d = data[0]
+#r_d = data[1]
+#c_d = data[2] #TODO changed this back due to erroneous results using the commented out way
+n_batches = 100000 / batch_size #TODO change 100000 to something like s_d.shape[0], for now I know there are 100 000 data points
 
 # create a matrix for use in the visual representation
-sparse_csc = sp.csc_matrix((data[0], (data[1], data[2])), shape=(n_users, n_items))
-actualMatrix = sparse_csc.todense()
-
+#sparse_coo = sp.coo_matrix((np.cast[np.int](s_d.get_value()), (np.cast[np.int](r_d.get_value()), np.cast[np.int](c_d.get_value()))), shape=(n_users, n_items))
+#actualMatrix = sparse_coo.todense()
+actualMatrix = ([1,2], [3,4])
 model.U.set_value(0.01 * np.random.randn(n_users, n_fac))
 model.V.set_value(0.01 * np.random.randn(n_fac, n_items))
 
@@ -76,9 +91,15 @@ g_V = T.grad(cost=cost, wrt=model.V)
 updates = {model.U: model.U - learning_rate * g_U, \
            model.V: model.V - learning_rate * g_V}
 
-train_model = theano.function(inputs=[sparseData, rowInd, colInd ],
+#have to replace inputs as an index representing the minibatch
+# add givens parameter, to replace references to sparseData, rowInd, colInd with data slices from
+#   shared variables, see example online
+train_model = theano.function(inputs=[index],
                               outputs=cost,
-                              updates=updates)
+                              updates=updates, givens={
+                                sparseData: s_d[index * batch_size: (index + 1) * batch_size],
+                                rowInd: r_d[index * batch_size: (index + 1) * batch_size],
+                                colInd: c_d[index * batch_size: (index + 1) * batch_size] })
 
 #get_grads = theano.function(inputs=[X, ], outputs=[g_U, g_V])
 
@@ -110,9 +131,12 @@ plt.tight_layout(pad=0.1)
 canvas.draw()
 bg = (canvas.copy_from_bbox(subs[0].bbox),
       canvas.copy_from_bbox(subs[1].bbox))
-sleep(5)
+sleep(1)
 for i in range(100):
-    avg_cost = train_model(data[0], data[1], data[2])
+
+    for minibatch_index in xrange(n_batches):
+        avg_cost = train_model(minibatch_index)
+
     #print model.U.get_value()
     #print get_grads(data)
     print str(i) + ' error: %4.4f' % avg_cost
