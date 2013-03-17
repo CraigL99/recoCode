@@ -136,10 +136,10 @@ for i in range(100):
 
     for minibatch_index in xrange(n_batches):
         avg_cost = train_model(minibatch_index)
+        print str(i) + ":"+str(minibatch_index) + ' error: %4.4f' % avg_cost
 
     #print model.U.get_value()
     #print get_grads(data)
-    print str(i) + ' error: %4.4f' % avg_cost
     approx = np.dot(model.U.get_value(), model.V.get_value())
 
     fig.canvas.restore_region(bg[1])
