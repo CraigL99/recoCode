@@ -19,8 +19,8 @@ class HiddenLayer(object):
 class MLP(object):
 
 	def __init__(self, n_users, n_items, n_fac):
-		self.hiddenLayer = HiddenLayer()
-
+		#self.hiddenLayer = HiddenLayer()
+		
 		self.modelLayer = MatrixFactorization(n_users=n_users, n_items=n_items, n_fac=n_fac)
 
 

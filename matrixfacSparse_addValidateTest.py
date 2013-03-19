@@ -28,8 +28,6 @@ class MatrixFactorization(object):
         return T.sum(T.square(sparseData-self.pred[rowInd, colInd]))
 
     def errors(self, sparseData, rowInd, colInd):
-        """Should this be any different than the squared_error method?
-        """
         return T.sum(T.square(sparseData-self.pred[rowInd, colInd]))
 
 
