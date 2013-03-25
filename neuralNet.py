@@ -68,13 +68,13 @@ def main():
 
 	#create a matrix to hold user bit vectors, size 0..99 999 x 0..942
 	itemBitMatrix = np.zeros((s_d.get_value().shape[0], n_items), dtype=int)
-	#itemBitMatrix[np.arange(s_d.get_value().shape[0]), (r_d.get_value()).astype(int)] = 1
+	itemBitMatrix[np.arange(s_d.get_value().shape[0]), (r_d.get_value()).astype(int)] = 1
 	
 	#cast rows to integers so they can be used as usual for indexing. (this used to be done within
 		#the read method however in order to create the bitMatrix, had to do it afterwards)
 
-	#r_d = T.cast(r_d, 'int32') 
-	#c_d = T.cast(c_d, 'int32')
+	r_d = T.cast(r_d, 'int32') 
+	c_d = T.cast(c_d, 'int32')
 
 	#compute number of baches
 	n_train_batches = s_d.get_value().shape[0] / batch_size
