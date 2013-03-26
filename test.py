@@ -71,9 +71,9 @@ def main():
 	s_d = np.asarray([1.0, 1.0])
 	#s_d = theano.shared( np.asarray(s_d, dtype=theano.config.floatX) )
 	
-	IBM = np.zeros((2,2), dtype=theano.config.floatX) #item bit matrix
+	IBM = np.zeros((3,2), dtype=theano.config.floatX) #item bit matrix
 	IBM[0,0] = 1
-	UBM = np.zeros((2,2), dtype=theano.config.floatX)
+	UBM = np.zeros((3,2), dtype=theano.config.floatX)
 	UBM[0,0] = 1 #user bit matrix
 
 	sparseData = T.vector('sparseData', dtype=theano.config.floatX)

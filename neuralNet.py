@@ -15,8 +15,12 @@ class MatrixFactorization(object):
 
         self.pred = T.dot(self.U, self.V)
 
-    def squared_error(self, sparseData, rowInd, colInd):
-        return T.sum(T.square(sparseData-self.pred[rowInd, colInd]))
+    def squared_error(self, sparseData, IBM, UBM):
+        UD = T.dot(UBM, self.U)
+        VD = T.dot(self.V, IBM)
+        matrix = UD*VD
+        pred = T.sum(matrix, axis=1)
+        return T.sum(T.square(sparseData-pred))
 
     def errors(self, sparseData, rowInd, colInd):
         return T.sum(T.square(sparseData-self.pred[rowInd, colInd]))
@@ -63,12 +67,12 @@ def main():
     c_d = data[2]
 
     #create a matrix to hold user bit vectors, size 0..99 999 x 0..1681
-    userBitMatrix = np.zeros((s_d.get_value().shape[0], n_users), dtype=theano.config.floatX)
-    userBitMatrix[np.arange(s_d.get_value().shape[0]), (r_d.get_value()).astype(int)] = 1
+    UBM = np.zeros((s_d.get_value().shape[0], n_users), dtype=theano.config.floatX)
+    UBM[np.arange(s_d.get_value().shape[0]), (r_d.get_value()).astype(int)] = 1
 
     #create a matrix to hold user bit vectors, size 0..99 999 x 0..942
-    itemBitMatrix = np.zeros((s_d.get_value().shape[0], n_items), dtype=theano.config.floatX)
-    itemBitMatrix[np.arange(s_d.get_value().shape[0]), (r_d.get_value()).astype(int)] = 1
+    IBM = np.zeros((s_d.get_value().shape[0], n_items), dtype=theano.config.floatX)
+    IBM[np.arange(s_d.get_value().shape[0]), (r_d.get_value()).astype(int)] = 1
 
     #cast rows to integers so they can be used as usual for indexing. (this used to be done within
     #the read method however in order to create the bitMatrix, had to do it afterwards)
@@ -85,24 +89,27 @@ def main():
     model.U.set_value(0.01 * np.random.randn(n_users, n_fac))
     model.V.set_value(0.01 * np.random.randn(n_fac, n_items))
 
-    #update cost, the squared error function and go from there. 
-    cost = 7
+    sparseData = T.vector('sparseData', dtype=theano.config.floatX)
+    itemBitMatrix = T.matrix('itemBitMatrix', dtype=theano.config.floatX)
+    userBitMatrix = T.matrix('itemBitMatrix', dtype=theano.config.floatX)
 
-    """
+    cost = model.squared_error(sparseData, itemBitMatrix, userBitMatrix)
+
     g_U = T.grad(cost=cost, wrt=model.U)
     g_V = T.grad(cost=cost, wrt=model.V)
 
     updates = {model.U: model.U - learning_rate * g_U, \
                model.V: model.V - learning_rate * g_V}
 
+    index = T.lscalar()
     train_model = theano.function(inputs=[index],
                                   outputs=cost,
                                   updates=updates, givens={
                                     sparseData: s_d[index * batch_size: (index + 1) * batch_size],
-                                    rowInd: r_d[index * batch_size: (index + 1) * batch_size],
-                                    colInd: c_d[index * batch_size: (index + 1) * batch_size] })
-    """ 
-    index = T.lscalar()
+                                    itemBitMatrix: IBM[index * batch_size: (index + 1) * batch_size],
+                                    userBitMatrix: UBM[index * batch_size: (index + 1) * batch_size] })
+
+
     for i in xrange(50):
         print i
 
