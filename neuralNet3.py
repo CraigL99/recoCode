@@ -17,7 +17,7 @@ class MatrixFactorization(object):
 
     def squared_error(self, sparseData, IBM, UBM):
         UD = T.dot(UBM, self.U)
-        VD = T.dot(self.V, IBM)
+        VD = T.dot(IBM, (self.V).T)
         matrix = UD*VD
         pred = T.sum(matrix, axis=1)
         return T.sum(T.square(sparseData-pred))
@@ -52,6 +52,19 @@ def readData( filename, n_users, n_items ):
 
     return shared_sparseData, shared_rowInd, shared_colInd, actualMatrix
 
+#return a bitMatrix corresponding to the current batch indicated by index
+def getUBM(index, batch_size, r_d, n_users):
+    #create a matrix to hold user bit vectors, size 0..99 999 x 0..1681
+    UBM = np.zeros((batch_size, n_users), dtype=theano.config.floatX)
+    UBM[np.arange(batch_size), ((r_d.get_value()).astype(int)[index * batch_size: (index + 1) * batch_size])] = 1
+    return UBM
+
+def getIBM(index, batch_size, c_d, n_items):    
+    #create a matrix to hold user bit vectors, size 0..99 999 x 0..942
+    IBM = np.zeros((batch_size, n_items), dtype=theano.config.floatX)
+    IBM[np.arange(batch_size), ((c_d.get_value()).astype(int)[index * batch_size: (index + 1) * batch_size])] = 1
+    return IBM
+
 def main():
     #global config variables
     learning_rate = 0.0001
@@ -65,18 +78,6 @@ def main():
     s_d = data[0]
     r_d = data[1]
     c_d = data[2]
-
-    #create a matrix to hold user bit vectors, size 0..99 999 x 0..1681
-    UBM = np.zeros((s_d.get_value().shape[0], n_users), dtype=theano.config.floatX)
-    UBM[np.arange(s_d.get_value().shape[0]), (r_d.get_value()).astype(int)] = 1
-        
-    #create a matrix to hold user bit vectors, size 0..99 999 x 0..942
-    IBM = np.zeros((s_d.get_value().shape[0], n_items), dtype=theano.config.floatX)
-    IBM[np.arange(s_d.get_value().shape[0]), (c_d.get_value()).astype(int)] = 1
-
-    #cast rows to integers so they can be used as usual for indexing. (this used to be done within
-    #the read method however in order to create the bitMatrix, had to do it afterwards)
-    #TODO is this needed?
 
     #compute number of baches
     n_train_batches = s_d.get_value().shape[0] / batch_size
@@ -102,16 +103,15 @@ def main():
                model.V: model.V - learning_rate * g_V}
 
     index = T.lscalar()
-    train_model = theano.function(inputs=[index],
+    train_model = theano.function(inputs=[sparseData, itemBitMatrix, userBitMatrix],
                                   outputs=cost,
-                                  updates=updates, givens={
-                                    sparseData: s_d[index * batch_size: (index + 1) * batch_size],
-                                    itemBitMatrix: IBM[index * batch_size: (index + 1) * batch_size],
-                                    userBitMatrix: UBM[index * batch_size: (index + 1) * batch_size] })
+                                  updates=updates)
 
 
     for i in xrange(50):
-        print i
+        for minibatch_index in xrange(n_train_batches):
+            avg_cost = train_model(s_d.get_value()[minibatch_index * batch_size: (minibatch_index + 1) * batch_size], getIBM(minibatch_index, batch_size, c_d, n_items), getUBM(minibatch_index, batch_size, r_d, n_users))
+            print str(i) + ":"+str(minibatch_index) + ' error: %4.4f' % avg_cost
 
     """for each batch
     	-convert the dataset to rowVectors, symbolicly

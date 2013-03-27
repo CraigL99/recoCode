@@ -15,9 +15,18 @@ class MatrixFactorization(object):
 
         self.pred = T.dot(self.U, self.V)
 
-    def squared_error(self, sparseData, IBM, UBM):
-        UD = T.dot(UBM, self.U)
-        VD = T.dot(self.V, IBM)
+    def squared_error(self, sparseData, rowInd, colInd, batch_size, n_users, n_items):
+        UBM = T.zeros((batch_size, n_users), dtype=theano.config.floatX)
+        #UBM[T.arange(batch_size), rowInd] = 1
+        new_UBM = T.basic.set_subtensor( UBM[ T.arange(batch_size):rowInd ], 1 )
+
+        IBM = T.zeros((batch_size, n_items), dtype=theano.config.floatX)
+        #IBM[T.arange(batch_size), colInd.astype(int)] = 1
+        new_IBM = T.basic.set_subtensor( IBM[ T.arange(batch_size):colInd ], 1 )
+
+        
+        UD = T.dot(new_UBM, self.U)
+        VD = T.dot(self.V, new_IBM)
         matrix = UD*VD
         pred = T.sum(matrix, axis=1)
         return T.sum(T.square(sparseData-pred))
@@ -50,7 +59,7 @@ def readData( filename, n_users, n_items ):
     shared_rowInd = theano.shared( np.asarray(rowInd, dtype=theano.config.floatX) )
     shared_colInd = theano.shared( np.asarray(colInd, dtype=theano.config.floatX) )
 
-    return shared_sparseData, shared_rowInd, shared_colInd, actualMatrix
+    return shared_sparseData, T.cast(shared_rowInd, 'int32'), T.cast(shared_colInd, 'int32'), actualMatrix
 
 def main():
     #global config variables
@@ -65,14 +74,6 @@ def main():
     s_d = data[0]
     r_d = data[1]
     c_d = data[2]
-
-    #create a matrix to hold user bit vectors, size 0..99 999 x 0..1681
-    UBM = np.zeros((s_d.get_value().shape[0], n_users), dtype=theano.config.floatX)
-    UBM[np.arange(s_d.get_value().shape[0]), (r_d.get_value()).astype(int)] = 1
-        
-    #create a matrix to hold user bit vectors, size 0..99 999 x 0..942
-    IBM = np.zeros((s_d.get_value().shape[0], n_items), dtype=theano.config.floatX)
-    IBM[np.arange(s_d.get_value().shape[0]), (c_d.get_value()).astype(int)] = 1
 
     #cast rows to integers so they can be used as usual for indexing. (this used to be done within
     #the read method however in order to create the bitMatrix, had to do it afterwards)
@@ -90,10 +91,10 @@ def main():
     model.V.set_value(0.01 * np.random.randn(n_fac, n_items))
 
     sparseData = T.vector('sparseData', dtype=theano.config.floatX)
-    itemBitMatrix = T.matrix('itemBitMatrix', dtype=theano.config.floatX)
-    userBitMatrix = T.matrix('itemBitMatrix', dtype=theano.config.floatX)
+    rowInd = T.vector('rowInd', dtype='int32')  # symbolic var for row indices
+    colInd = T.vector('colInd', dtype='int32')  # symbolic var for col indices
 
-    cost = model.squared_error(sparseData, itemBitMatrix, userBitMatrix)
+    cost = model.squared_error(sparseData, rowInd, colInd, batch_size, n_users, n_items)
 
     g_U = T.grad(cost=cost, wrt=model.U)
     g_V = T.grad(cost=cost, wrt=model.V)
@@ -106,8 +107,8 @@ def main():
                                   outputs=cost,
                                   updates=updates, givens={
                                     sparseData: s_d[index * batch_size: (index + 1) * batch_size],
-                                    itemBitMatrix: IBM[index * batch_size: (index + 1) * batch_size],
-                                    userBitMatrix: UBM[index * batch_size: (index + 1) * batch_size] })
+                                    rowInd: r_d[index * batch_size: (index + 1) * batch_size],
+                                    colInd: c_d[index * batch_size: (index + 1) * batch_size] })
 
 
     for i in xrange(50):

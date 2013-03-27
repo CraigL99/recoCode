@@ -49,6 +49,14 @@ def testSumAlongRows():
 
 
 """
+def squared_error(sparseData, IBM, UBM):
+	UD = T.dot(UBM, U)
+	VD = T.dot(V, IBM)
+	#return UD
+	matrix = UD*VD
+
+	pred = T.sum(matrix, axis=1)
+	return T.sum(T.square(sparseData-pred))
 
 U = theano.shared(value=np.zeros((
             2, 2), dtype=theano.config.floatX), name='U')
@@ -58,14 +66,11 @@ V = theano.shared(value=np.zeros((
             2, 2), dtype=theano.config.floatX), name='U')
 V.set_value(0.01 * np.random.randn(2, 2))
 
-def squared_error(sparseData, IBM, UBM):
-	UD = T.dot(UBM, U)
-	VD = T.dot(V, IBM)
-	#return UD
-	matrix = UD*VD
+def squared_error2():
+	UBM = T.zeros((batch_size, n_users), dtype=theano.config.floatX)
 
-	pred = T.sum(matrix, axis=1)
-	return T.sum(T.square(sparseData-pred))
+
+def testIndexing():
 
 def main():
 	s_d = np.asarray([1.0, 1.0])
@@ -87,4 +92,4 @@ def main():
 	print train_model(1)
 
 if __name__ =='__main__':
-	main()
+	testIndexing()
